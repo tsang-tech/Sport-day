@@ -23,7 +23,8 @@
         .group-config-card { background: #fff3e0; padding: 20px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #ff9800; }
         .group-edit-item { display: inline-flex; align-items: center; margin-right: 15px; margin-bottom: 10px; background: white; padding: 5px 10px; border-radius: 6px; border: 1px solid #ddd; }
         .group-edit-item input { padding: 5px; border: none; outline: none; width: 120px; font-weight: bold; }
-        .icon-btn { background: #ff4d4f; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; margin-left: 5px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center;}
+        .icon-btn { background: #ff4d4f; color: white; border: none; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; margin-left: 5px; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; transition: 0.2s;}
+        .icon-btn:hover { background: #d93025; transform: scale(1.1); }
 
         .smart-btn { background: linear-gradient(45deg, #9c27b0, #e91e63); color: white; padding: 12px 20px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(233, 30, 99, 0.3); transition: 0.3s; }
         .smart-btn:hover { transform: translateY(-2px); }
@@ -32,9 +33,11 @@
         .btn-primary { background: #1a73e8; color: white; }
         .btn-success { background: #34a853; color: white; }
         .btn-danger { background: #ea4335; color: white; }
-        .btn-warning { background: #fbbc04; color: black; }
+        .btn-warning { background: #fbbc04; color: black; font-weight: bold; }
         
-        .timer-display { font-family: monospace; font-size: 1.3em; font-weight: bold; color: #d93025; min-width: 90px; display: inline-block; }
+        .input-score { width: 75px; padding: 6px; border: 1px solid #aaa; border-radius: 4px; font-family: monospace; font-size: 14px; text-align: center; font-weight: bold; color: #d93025; }
+        .input-score:disabled { background: #eee; color: #888; }
+        
         .control-panel { display: flex; gap: 20px; margin-bottom: 20px; background: #eee; padding: 15px; border-radius: 10px; align-items: center; flex-wrap: wrap; }
     </style>
 </head>
@@ -65,7 +68,6 @@
     </div>
 
     <div id="panel-groups" class="panel">
-        
         <div style="text-align: center; margin-bottom: 20px;">
             <button class="smart-btn" onclick="smartAssignGroups()">✨ 一鍵智能分組 (按出生年份及性別)</button>
             <p style="color: #666; font-size: 0.9em; margin-top: 10px;">系統將自動提取年份及性別，建立並分配組別</p>
@@ -95,6 +97,7 @@
     <div id="panel-record" class="panel">
         <div class="control-panel">
             <div>比賽項目：<select id="eventSelect" onchange="refreshRecordView()">
+                <option value="28m">28米跑</option>
                 <option value="60m">60米短跑</option>
                 <option value="100m">100米短跑</option>
                 <option value="softball">擲壘球</option>
@@ -107,7 +110,7 @@
 
         <table id="recordTable">
             <thead>
-                <tr><th>姓名</th><th>原班別</th><th>成績</th><th>操作</th></tr>
+                <tr><th>姓名</th><th>原班別</th><th>成績 (最佳紀錄)</th><th>操作控制台</th></tr>
             </thead>
             <tbody id="recordList"></tbody>
         </table>
@@ -127,7 +130,7 @@
     let groups = []; 
     let runningTimers = {};
 
-    // --- 【新功能：自動儲存系統】 ---
+    // --- 自動儲存系統 ---
     function saveData() {
         localStorage.setItem('sportsData_students', JSON.stringify(students));
         localStorage.setItem('sportsData_groups', JSON.stringify(groups));
@@ -139,6 +142,13 @@
         
         if(storedStudents) students = JSON.parse(storedStudents);
         if(storedGroups) groups = JSON.parse(storedGroups);
+
+        // 確保舊資料也有 '28m' 的成績欄位
+        students.forEach(s => {
+            if (s.results && s.results['28m'] === undefined) {
+                s.results['28m'] = null;
+            }
+        });
 
         if(students.length > 0 || groups.length > 0) {
             document.getElementById('importStatus').innerText = `✅ 已恢復上次未完成的自動存檔（共 ${students.length} 名學生）。如需新名單，可直接匯入覆蓋，或按下方清除資料。`;
@@ -161,10 +171,8 @@
         }
     }
 
-    // 啟動時讀取資料
     window.onload = loadData;
 
-    // --- UI 切換 ---
     function showPanel(panelId) {
         document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -185,7 +193,6 @@
             const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
             const json = XLSX.utils.sheet_to_json(firstSheet);
             
-            // 加入唯一的 UID，防止學號重複或手動新增時衝突
             students = json.map(row => ({
                 uid: 'U' + Date.now() + Math.floor(Math.random()*10000), 
                 class: row['班別'] || '',
@@ -194,13 +201,14 @@
                 gender: row['性別'] || '',
                 dob: row['出生日期'] || '',
                 groupId: null,
-                results: { '60m': null, '100m': null, 'softball': null }
+                // 加入 28m 項目
+                results: { '28m': null, '60m': null, '100m': null, 'softball': null }
             }));
 
-            saveData(); // 儲存進 LocalStorage
+            saveData(); 
             updateClassDropdowns();
             document.getElementById('importStatus').innerText = `✅ 成功載入 ${students.length} 名學生。請按「第二步」進行一鍵分組。`;
-            document.querySelectorAll('.nav-btn')[1].click(); // 自動跳轉
+            document.querySelectorAll('.nav-btn')[1].click(); 
         };
         reader.readAsArrayBuffer(file);
     });
@@ -242,12 +250,12 @@
         });
 
         groups.sort((a, b) => a.name.localeCompare(b.name));
-        saveData(); // 分組後儲存
+        saveData(); 
         renderGroupEditor(); renderAssignmentList(); updateGroupFilters();
         alert(`✨ 分組成功！\n成功將 ${assignedCount} 名學生智能分配入對應的組別。`);
     }
 
-    // --- 組別管理 ---
+    // --- 組別與學生清單管理 ---
     function addNewGroup() {
         const name = document.getElementById('newGroupName').value.trim();
         if(name) { groups.push({ id: Date.now(), name }); document.getElementById('newGroupName').value = ''; saveData(); renderGroupEditor(); updateGroupFilters(); }
@@ -267,12 +275,11 @@
         document.getElementById('groupNameEditor').innerHTML = groups.map(g => `
             <div class="group-edit-item">
                 <input type="text" value="${g.name}" onchange="updateGroupName(${g.id}, this.value)">
-                <button class="icon-btn" onclick="deleteGroup(${g.id})">✕</button>
+                <button class="icon-btn" onclick="deleteGroup(${g.id})" title="刪除組別">✕</button>
             </div>
         `).join('');
     }
 
-    // --- 學生名單管理 ---
     function updateClassDropdowns() {
         const classes = [...new Set(students.map(s => s.class))].filter(Boolean).sort();
         document.getElementById('assignClassFilter').innerHTML = '<option value="">-- 請選擇班別 --</option>' + classes.map(c => `<option value="${c}">${c}</option>`).join('');
@@ -296,13 +303,10 @@
 
     function updateStudentGroup(uid, groupId) {
         const s = students.find(x => x.uid === uid);
-        if(s) {
-            s.groupId = groupId ? Number(groupId) : null;
-            saveData(); // 更改組別後儲存
-        }
+        if(s) { s.groupId = groupId ? Number(groupId) : null; saveData(); }
     }
 
-    // --- 【新功能：臨場新增與廢除學生】 ---
+    // --- 臨場新增與廢除學生 ---
     function manualAddStudent() {
         const gId = document.getElementById('groupFilter').value;
         if(!gId) { alert("請先在上方選擇你要將學生加入哪一個「作賽組別」！"); return; }
@@ -314,24 +318,17 @@
 
         students.push({
             uid: 'U' + Date.now() + Math.floor(Math.random()*10000), 
-            class: cls || '',
-            no: no || '',
-            name: name,
-            gender: '',
-            dob: '',
-            groupId: Number(gId),
-            results: { '60m': null, '100m': null, 'softball': null }
+            class: cls || '', no: no || '', name: name, gender: '', dob: '', groupId: Number(gId),
+            results: { '28m': null, '60m': null, '100m': null, 'softball': null } // 加入 28m
         });
         
-        saveData(); // 儲存新增
-        refreshRecordView(); // 重新整理表格
+        saveData(); refreshRecordView(); 
     }
 
     function removeStudent(uid, name) {
-        if(confirm(`⚠️ 確定要將「${name}」從系統中完全廢除並刪除成績嗎？這項操作無法復原。`)) {
+        if(confirm(`⚠️ 確定要將「${name}」從系統中完全廢除嗎？成績無法復原。`)) {
             students = students.filter(s => s.uid !== uid);
-            saveData(); // 儲存刪除狀態
-            refreshRecordView(); // 重新整理表格
+            saveData(); refreshRecordView(); 
             if(document.getElementById('panel-groups').classList.contains('active')) renderAssignmentList();
         }
     }
@@ -344,29 +341,67 @@
         if(curr) select.value = curr;
     }
 
+    // 手動儲存時間或距離 (將文字轉化為系統數字儲存)
+    function saveManualResult(uid, val) {
+        const evt = document.getElementById('eventSelect').value;
+        const num = parseFloat(val);
+        const s = students.find(x => x.uid === uid);
+        
+        if (!isNaN(num) && num > 0) {
+            // 如果是跑步(時間)，底層存的是毫秒 (乘以 1000)
+            if (evt !== 'softball') {
+                s.results[evt] = num * 1000;
+            } else {
+                // 如果是壘球，直接存距離 (米)
+                s.results[evt] = num;
+            }
+        } else {
+            s.results[evt] = null;
+        }
+        saveData();
+        // 更新排行榜，但不用整個重新刷新清單以免干擾正在輸入的老師
+        updateLeaderboard(); 
+        
+        // 更新「最佳紀錄」欄位的顯示
+        const resDisplay = document.getElementById(`res-${uid}`);
+        if(s.results[evt]) {
+            resDisplay.innerText = evt !== 'softball' ? (s.results[evt]/1000).toFixed(3) + ' 秒' : s.results[evt] + ' 米';
+            resDisplay.style.color = '#d93025';
+        } else {
+            resDisplay.innerText = '無';
+            resDisplay.style.color = '#888';
+        }
+    }
+
     function refreshRecordView() {
         const gId = document.getElementById('groupFilter').value;
         const evt = document.getElementById('eventSelect').value;
-        if(!gId) { document.getElementById('recordList').innerHTML = '<tr><td colspan="4" style="text-align:center;">請選擇組別</td></tr>'; document.getElementById('lbList').innerHTML=''; return; }
+        if(!gId) { document.getElementById('recordList').innerHTML = '<tr><td colspan="4" style="text-align:center;">請選擇作賽組別</td></tr>'; document.getElementById('lbList').innerHTML=''; return; }
 
         document.getElementById('recordList').innerHTML = students.filter(s => s.groupId == gId).map(s => {
             const uid = s.uid;
             const res = s.results[evt];
             const isTime = evt !== 'softball';
             
-            // 控制面板加入刪除按鈕
+            // 加入雙模輸入：可以手動輸入框，也可以用計時按鈕
             const control = isTime ? `
-                <span class="timer-display" id="disp-${uid}">${res ? (res/1000).toFixed(3) : '0.000'}</span>
-                <button class="btn btn-primary" id="start-${uid}" onclick="startTimer('${uid}')">開始</button>
-                <button class="btn btn-danger" id="stop-${uid}" style="display:none;" onclick="stopTimer('${uid}')">停止</button>
+                <input type="number" step="0.001" id="input-${uid}" class="input-score" placeholder="秒數" value="${res ? (res/1000).toFixed(3) : ''}" onchange="saveManualResult('${uid}', this.value)"> 秒
+                <button class="btn btn-primary" id="start-${uid}" onclick="startTimer('${uid}')" style="margin-left:5px;">計時</button>
+                <button class="btn btn-danger" id="stop-${uid}" style="display:none; margin-left:5px;" onclick="stopTimer('${uid}')">停止</button>
                 <button class="btn" onclick="resetScore('${uid}')">重置</button>
                 <button class="icon-btn" onclick="removeStudent('${uid}', '${s.name}')" title="廢除學生">🗑️</button>
             ` : `
-                <input type="number" step="0.01" class="btn" style="width:70px;background:white;border:1px solid #ccc;color:black;" value="${res || ''}" onchange="saveDist('${uid}',this.value)"> 米
-                <button class="icon-btn" onclick="removeStudent('${uid}', '${s.name}')" title="廢除學生" style="margin-left:15px;">🗑️</button>
+                <input type="number" step="0.01" class="input-score" placeholder="距離" value="${res || ''}" onchange="saveManualResult('${uid}', this.value)"> 米
+                <button class="btn" onclick="resetScore('${uid}')" style="margin-left:5px;">重置</button>
+                <button class="icon-btn" onclick="removeStudent('${uid}', '${s.name}')" title="廢除學生">🗑️</button>
             `;
 
-            return `<tr><td><strong>${s.name}</strong></td><td>${s.class} (${s.no})</td><td id="res-${uid}" style="color:#d93025; font-weight:bold;">${res ? (isTime ? (res/1000).toFixed(3)+'秒' : res+'米') : '無'}</td><td>${control}</td></tr>`;
+            return `<tr>
+                <td><strong style="font-size:16px;">${s.name}</strong></td>
+                <td>${s.class} (${s.no})</td>
+                <td id="res-${uid}" style="color:${res ? '#d93025' : '#888'}; font-weight:bold;">${res ? (isTime ? (res/1000).toFixed(3)+' 秒' : res+' 米') : '無'}</td>
+                <td>${control}</td>
+            </tr>`;
         }).join('');
         updateLeaderboard();
     }
@@ -374,29 +409,49 @@
     function startTimer(uid) {
         if(runningTimers[uid]) return;
         const start = Date.now();
-        runningTimers[uid] = setInterval(() => document.getElementById('disp-'+uid).innerText = ((Date.now() - start)/1000).toFixed(3), 10);
-        document.getElementById('start-'+uid).style.display = 'none'; document.getElementById('stop-'+uid).style.display = 'inline-block';
+        const inputField = document.getElementById('input-'+uid);
+        inputField.disabled = true; // 計時期間鎖定輸入框
+        
+        runningTimers[uid] = setInterval(() => {
+            inputField.value = ((Date.now() - start)/1000).toFixed(3);
+        }, 10);
+        
+        document.getElementById('start-'+uid).style.display = 'none'; 
+        document.getElementById('stop-'+uid).style.display = 'inline-block';
     }
+    
     function stopTimer(uid) {
         clearInterval(runningTimers[uid]);
-        const final = parseFloat(document.getElementById('disp-'+uid).innerText) * 1000;
         delete runningTimers[uid];
-        students.find(x => x.uid === uid).results[document.getElementById('eventSelect').value] = final;
-        saveData(); // 紀錄成績後儲存
-        refreshRecordView();
+        
+        const inputField = document.getElementById('input-'+uid);
+        inputField.disabled = false; // 解鎖輸入框
+        
+        // 抓取停止那一刻框內的時間並儲存
+        saveManualResult(uid, inputField.value);
+        
+        document.getElementById('start-'+uid).style.display = 'inline-block'; 
+        document.getElementById('stop-'+uid).style.display = 'none';
     }
-    function saveDist(uid, val) { students.find(x => x.uid === uid).results[document.getElementById('eventSelect').value] = val ? parseFloat(val) : null; saveData(); refreshRecordView(); }
-    function resetScore(uid) { students.find(x => x.uid === uid).results[document.getElementById('eventSelect').value] = null; saveData(); refreshRecordView(); }
+    
+    function resetScore(uid) { 
+        students.find(x => x.uid === uid).results[document.getElementById('eventSelect').value] = null; 
+        saveData(); 
+        refreshRecordView(); 
+    }
 
     function updateLeaderboard() {
         const gId = document.getElementById('groupFilter').value;
         const evt = document.getElementById('eventSelect').value;
         if(!gId) return;
         let scores = students.filter(s => s.groupId == gId && s.results[evt] !== null);
+        
+        // 排序規則：跑步(包括 28m)越少時間越好；壘球越遠越好
         scores.sort((a, b) => evt === 'softball' ? b.results[evt] - a.results[evt] : a.results[evt] - b.results[evt]);
+        
         document.getElementById('lbList').innerHTML = scores.slice(0, 8).map((s, i) => `
             <tr style="${i===0?'background:#fff59d;font-weight:bold;':''}">
-                <td>${i+1}</td><td>${s.name}</td><td>${s.class}</td><td>${evt === 'softball' ? s.results[evt]+'米' : (s.results[evt]/1000).toFixed(3)+'秒'}</td>
+                <td>${i+1}</td><td>${s.name}</td><td>${s.class}</td><td>${evt === 'softball' ? s.results[evt]+' 米' : (s.results[evt]/1000).toFixed(3)+' 秒'}</td>
             </tr>
         `).join('');
     }
@@ -407,13 +462,16 @@
             return {
                 '班別': s.class, '學號': s.no, '姓名': s.name, '性別': s.gender, '出生日期': s.dob,
                 '分配組別': g ? g.name : '未分組',
-                '60米(秒)': s.results['60m'] ? (s.results['60m']/1000).toFixed(3) : '',
-                '100米(秒)': s.results['100m'] ? (s.results['100m']/1000).toFixed(3) : '',
+                '28米跑(秒)': s.results['28m'] ? (s.results['28m']/1000).toFixed(3) : '',
+                '60米跑(秒)': s.results['60m'] ? (s.results['60m']/1000).toFixed(3) : '',
+                '100米跑(秒)': s.results['100m'] ? (s.results['100m']/1000).toFixed(3) : '',
                 '擲壘球(米)': s.results['softball'] || ''
             };
         });
         const ws = XLSX.utils.json_to_sheet(data);
-        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "體育成績"); XLSX.writeFile(wb, "智能分組體育成績.xlsx");
+        const wb = XLSX.utils.book_new(); 
+        XLSX.utils.book_append_sheet(wb, ws, "體育成績"); 
+        XLSX.writeFile(wb, "智能分組體育成績.xlsx");
     }
 </script>
 </body>
