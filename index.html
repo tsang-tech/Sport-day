@@ -10,7 +10,6 @@
         .container { max-width: 1100px; margin: 0 auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
         h1 { text-align: center; color: #1a73e8; }
 
-        /* 分頁切換 */
         .main-nav { display: flex; justify-content: center; gap: 10px; margin-bottom: 25px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
         .nav-btn { padding: 10px 20px; border: none; background: #eee; cursor: pointer; border-radius: 8px; font-weight: bold; font-size: 15px; }
         .nav-btn.active { background: #1a73e8; color: white; }
@@ -21,7 +20,6 @@
         th, td { padding: 12px; border-bottom: 1px solid #eee; text-align: left; }
         th { background: #f8f9fa; position: sticky; top: 0; }
 
-        /* 組別設定區 */
         .group-config-card { background: #fff3e0; padding: 20px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #ff9800; }
         .group-edit-item { display: inline-flex; align-items: center; margin-right: 15px; margin-bottom: 10px; background: white; padding: 5px 10px; border-radius: 6px; border: 1px solid #ddd; }
         .group-edit-item input { padding: 5px; border: none; outline: none; width: 120px; font-weight: bold; }
@@ -44,21 +42,21 @@
     <h1>🏆 體育成績智能分組紀錄系統</h1>
 
     <div class="main-nav">
-        <button class="nav-btn active" onclick="showPanel('import')">1. 匯入與導出</button>
-        <button class="nav-btn" onclick="showPanel('groups')">2. 組別設定與智能分組</button>
-        <button class="nav-btn" onclick="showPanel('record')">3. 成績紀錄</button>
+        <button class="nav-btn active" onclick="showPanel('import')">1. 匯入名單</button>
+        <button class="nav-btn" onclick="showPanel('groups')">2. 智能分組</button>
+        <button class="nav-btn" onclick="showPanel('record')">3. 記錄成績</button>
     </div>
 
     <div id="panel-import" class="panel active">
         <div style="background: #e3f2fd; padding: 20px; border-radius: 10px;">
             <h3>📥 Excel / CSV 名單匯入</h3>
-            <p>請選擇包含「班別」、「學號」、「中文姓名」、「性別」、「出生日期」的 Excel 檔案：</p>
+            <p>請選擇包含「班別」、「學號」、「中文姓名」、「性別」、「出生日期」的檔案：</p>
             <input type="file" id="excelInput" accept=".xlsx, .xls, .csv">
             <hr>
             <div id="importStatus" style="font-weight: bold; color: #1a73e8;">目前未載入任何名單。</div>
         </div>
         <div style="text-align: right; margin-top: 20px;">
-            <button class="btn btn-success" onclick="exportToExcel()">💾 導出所有成績至 Excel</button>
+            <button class="btn btn-success" onclick="exportToExcel()">💾 導出最終成績至 Excel</button>
         </div>
     </div>
 
@@ -66,26 +64,25 @@
         
         <div style="text-align: center; margin-bottom: 20px;">
             <button class="smart-btn" onclick="smartAssignGroups()">✨ 一鍵智能分組 (按出生年份及性別)</button>
-            <p style="color: #666; font-size: 0.9em; margin-top: 10px;">系統將讀取「出生日期」及「性別」(M/F)，自動分配並建立組別。</p>
+            <p style="color: #666; font-size: 0.9em; margin-top: 10px;">如果他是 2019年出世 + 男性，就會自動建立並安排入「2019年男子組」</p>
         </div>
 
         <div class="group-config-card">
-            <h3>⚙️ 管理組別</h3>
+            <h3>⚙️ 已建立的組別</h3>
             <div style="margin-bottom: 15px;">
                 <input type="text" id="newGroupName" placeholder="輸入新組別名稱" style="padding: 8px; border-radius: 4px; border: 1px solid #ccc;">
-                <button class="btn btn-primary" onclick="addNewGroup()">+ 新增組別</button>
+                <button class="btn btn-primary" onclick="addNewGroup()">+ 新增自訂組別</button>
             </div>
-            <div id="groupNameEditor">
-                </div>
+            <div id="groupNameEditor"></div>
         </div>
 
-        <h3>🧑‍🤝‍🧑 學生分組名單 (可手動微調)</h3>
+        <h3>🧑‍🤝‍🧑 學生分組名單</h3>
         <div style="margin-bottom: 10px;">
             篩選班別：<select id="assignClassFilter" onchange="renderAssignmentList()"></select>
         </div>
         <table>
             <thead>
-                <tr><th>班別/學號</th><th>姓名</th><th>性別</th><th>出生日期</th><th>分配組別</th></tr>
+                <tr><th>班別/學號</th><th>姓名</th><th>性別</th><th>出生日期</th><th>所屬組別</th></tr>
             </thead>
             <tbody id="assignmentList"></tbody>
         </table>
@@ -119,9 +116,7 @@
 </div>
 
 <script>
-    // --- 資料儲存 ---
     let students = [];
-    // 預設為空，等待智能分組或手動建立
     let groups = []; 
     let runningTimers = {};
 
@@ -135,7 +130,7 @@
         if(panelId === 'record') { updateGroupFilters(); refreshRecordView(); }
     }
 
-    // --- Excel 讀取 ---
+    // --- 匯入 Excel ---
     document.getElementById('excelInput').addEventListener('change', function(e) {
         const file = e.target.files[0];
         const reader = new FileReader();
@@ -143,8 +138,9 @@
             const data = new Uint8Array(evt.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
             const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-            // {raw: false} 確保日期會被讀取為字串 (如 "2014-06-15") 而不是 Excel 內部數字
-            const json = XLSX.utils.sheet_to_json(firstSheet, { raw: false });
+            
+            // 使用預設讀取，保留 Excel 的原始日期格式
+            const json = XLSX.utils.sheet_to_json(firstSheet);
             
             students = json.map(row => ({
                 class: row['班別'] || '',
@@ -152,130 +148,112 @@
                 name: row['中文姓名'] || row['英文姓名'] || '',
                 gender: row['性別'] || '',
                 dob: row['出生日期'] || '',
-                strn: row['STRN'] || '',
                 groupId: null,
                 results: { '60m': null, '100m': null, 'softball': null }
             }));
 
             updateClassDropdowns();
-            document.getElementById('importStatus').innerText = `✅ 成功載入 ${students.length} 名學生。請前往「組別設定」進行智能分組。`;
+            document.getElementById('importStatus').innerText = `✅ 成功載入 ${students.length} 名學生。請按「第二步」進行一鍵分組。`;
+            
+            // 跳轉至第二頁
+            document.querySelectorAll('.nav-btn')[1].click();
         };
         reader.readAsArrayBuffer(file);
     });
 
-    // --- 智能分組邏輯 ---
+    // --- 【修復：超強年份提取與智能分組邏輯】 ---
     function smartAssignGroups() {
         if(students.length === 0) {
-            alert("請先在第一頁匯入學生名單！");
-            return;
+            alert("請先匯入學生名單！"); return;
         }
 
-        let newGroupsCount = 0;
         let assignedCount = 0;
 
         students.forEach(s => {
-            if(!s.dob || !s.gender) return; // 欠缺資料則跳過
+            if(!s.dob || !s.gender) return; 
 
-            // 從 "2014-06-15" 或 "2014/06/15" 提取前4個字 (年份)
-            const yearMatch = s.dob.match(/^(\d{4})/);
-            if(!yearMatch) return;
-            const year = yearMatch[1];
-
-            // 判斷性別
-            let genderStr = "";
-            let g = s.gender.toUpperCase().trim();
-            if(g === 'M' || g === '男') genderStr = "男子組";
-            else if(g === 'F' || g === '女') genderStr = "女子組";
-            else return; // 無法識別性別
-
-            const targetGroupName = `${year}年${genderStr}`;
-
-            // 尋找是否已有此組別，沒有則自動創建
-            let group = groups.find(x => x.name === targetGroupName);
-            if(!group) {
-                group = { id: Date.now() + Math.floor(Math.random() * 1000), name: targetGroupName };
-                groups.push(group);
-                newGroupsCount++;
+            // 1. 強制提取出生年份 (支援 "2019-06-11", "11/6/2019", 或 Excel 內部數字)
+            let year = "";
+            if (typeof s.dob === 'number') {
+                // 如果 Excel 將日期轉換成了數字
+                const d = new Date((s.dob - 25569) * 86400 * 1000);
+                year = d.getFullYear();
+            } else {
+                // 如果是文字格式，尋找字串裡面的 "201X" 或 "202X"
+                const dobStr = String(s.dob);
+                const yearMatch = dobStr.match(/(201\d|202\d)/);
+                if (yearMatch) year = yearMatch[1];
             }
 
-            // 分配學生到該組
+            if (!year) return; // 真的找不到年份就跳過
+
+            // 2. 判斷性別
+            let genderStr = "";
+            let g = String(s.gender).toUpperCase().trim();
+            if(g === 'M' || g === '男') genderStr = "男子組";
+            else if(g === 'F' || g === '女') genderStr = "女子組";
+            else return;
+
+            // 3. 組合出目標名稱 (例如：2019年男子組)
+            const targetGroupName = `${year}年${genderStr}`;
+
+            // 4. 建立並指派
+            let group = groups.find(x => x.name === targetGroupName);
+            if(!group) {
+                group = { id: Date.now() + Math.random(), name: targetGroupName };
+                groups.push(group);
+            }
             s.groupId = group.id;
             assignedCount++;
         });
 
-        // 依照年份和性別排序組別，讓選單更整齊
+        // 排序組別名稱，看起來更整齊
         groups.sort((a, b) => a.name.localeCompare(b.name));
 
         renderGroupEditor();
         renderAssignmentList();
         updateGroupFilters();
         
-        alert(`✨ 智能分組完成！\n成功分配了 ${assignedCount} 名學生。\n自動建立了 ${newGroupsCount} 個新組別。`);
+        alert(`✨ 分組成功！\n成功將 ${assignedCount} 名學生智能分配入對應的組別（如 ${groups.length > 0 ? groups[0].name : ''}等）。`);
     }
 
-    // --- 組別管理 ---
+    // --- 其他 UI 控制邏輯 ---
     function addNewGroup() {
-        const input = document.getElementById('newGroupName');
-        const name = input.value.trim();
-        if(!name) return;
-        
-        groups.push({ id: Date.now(), name: name });
-        input.value = '';
-        renderGroupEditor();
-        updateGroupFilters();
-        renderAssignmentList();
+        const name = document.getElementById('newGroupName').value.trim();
+        if(name) { groups.push({ id: Date.now(), name }); document.getElementById('newGroupName').value = ''; renderGroupEditor(); updateGroupFilters(); }
     }
-
     function deleteGroup(id) {
-        if(confirm("確定要刪除這個組別嗎？組內的學生將變回「未分組」狀態。")) {
+        if(confirm("確定刪除此組別？")) {
             groups = groups.filter(g => g.id !== id);
             students.forEach(s => { if(s.groupId === id) s.groupId = null; });
-            renderGroupEditor();
-            updateGroupFilters();
-            renderAssignmentList();
+            renderGroupEditor(); updateGroupFilters(); renderAssignmentList();
         }
     }
-
     function updateGroupName(id, newName) {
         const g = groups.find(x => x.id === id);
-        if(g) {
-            g.name = newName;
-            updateGroupFilters();
-        }
+        if(g) { g.name = newName; updateGroupFilters(); }
     }
-
     function renderGroupEditor() {
-        const container = document.getElementById('groupNameEditor');
-        container.innerHTML = groups.map(g => `
+        document.getElementById('groupNameEditor').innerHTML = groups.map(g => `
             <div class="group-edit-item">
                 <input type="text" value="${g.name}" onchange="updateGroupName(${g.id}, this.value)">
-                <button class="del-btn" onclick="deleteGroup(${g.id})" title="刪除組別">✕</button>
+                <button class="del-btn" onclick="deleteGroup(${g.id})">✕</button>
             </div>
         `).join('');
     }
 
-    // --- 手動分組介面 ---
     function updateClassDropdowns() {
         const classes = [...new Set(students.map(s => s.class))].filter(Boolean).sort();
-        const select = document.getElementById('assignClassFilter');
-        select.innerHTML = '<option value="">-- 請選擇班別 --</option>' + 
-                           classes.map(c => `<option value="${c}">${c}</option>`).join('');
+        document.getElementById('assignClassFilter').innerHTML = '<option value="">-- 請選擇班別 --</option>' + classes.map(c => `<option value="${c}">${c}</option>`).join('');
     }
-
     function renderAssignmentList() {
         const cls = document.getElementById('assignClassFilter').value;
-        const list = document.getElementById('assignmentList');
-        if(!cls) { list.innerHTML = ''; return; }
-
         const filtered = students.filter(s => s.class === cls);
-        list.innerHTML = filtered.map(s => `
+        document.getElementById('assignmentList').innerHTML = filtered.map(s => `
             <tr>
-                <td>${s.class} (${s.no})</td>
-                <td>${s.name}</td>
-                <td>${s.gender}</td>
-                <td>${s.dob}</td>
+                <td>${s.class} (${s.no})</td><td>${s.name}</td><td>${s.gender}</td><td>${s.dob}</td>
                 <td>
-                    <select onchange="assignGroup('${s.class}', '${s.no}', this.value)">
+                    <select onchange="students.find(x=>x.class==='${s.class}'&&String(x.no)==='${s.no}').groupId=this.value?Number(this.value):null">
                         <option value="">-- 未分組 --</option>
                         ${groups.map(g => `<option value="${g.id}" ${s.groupId == g.id ? 'selected' : ''}>${g.name}</option>`).join('')}
                     </select>
@@ -284,49 +262,31 @@
         `).join('');
     }
 
-    function assignGroup(cls, no, gId) {
-        const student = students.find(s => s.class === cls && s.no === String(no));
-        if(student) student.groupId = gId ? parseInt(gId) : null;
-    }
-
     // --- 成績紀錄核心 ---
     function updateGroupFilters() {
         const select = document.getElementById('groupFilter');
-        const currentVal = select.value;
-        select.innerHTML = '<option value="">-- 請先選擇作賽組別 --</option>' + 
-            groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
-        if(currentVal) select.value = currentVal;
+        const curr = select.value;
+        select.innerHTML = '<option value="">-- 選擇作賽組別 --</option>' + groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+        if(curr) select.value = curr;
     }
 
     function refreshRecordView() {
         const gId = document.getElementById('groupFilter').value;
         const evt = document.getElementById('eventSelect').value;
-        const list = document.getElementById('recordList');
-        
-        if(!gId) { list.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#888;">請選擇上方作賽組別</td></tr>'; return; }
+        if(!gId) { document.getElementById('recordList').innerHTML = '<tr><td colspan="4" style="text-align:center;">請選擇組別</td></tr>'; return; }
 
-        const filtered = students.filter(s => s.groupId == gId);
-        list.innerHTML = filtered.map(s => {
+        document.getElementById('recordList').innerHTML = students.filter(s => s.groupId == gId).map(s => {
             const sId = `${s.class}-${s.no}`;
             const res = s.results[evt];
             const isTime = evt !== 'softball';
-            
-            let control = isTime ? `
+            const control = isTime ? `
                 <span class="timer-display" id="disp-${sId}">${res ? (res/1000).toFixed(3) : '0.000'}</span>
-                <button class="btn btn-primary btn-start" id="start-${sId}" onclick="startTimer('${sId}')">開始</button>
+                <button class="btn btn-primary" id="start-${sId}" onclick="startTimer('${sId}')">開始</button>
                 <button class="btn btn-danger" id="stop-${sId}" style="display:none;" onclick="stopTimer('${sId}')">停止</button>
                 <button class="btn" onclick="resetScore('${s.class}','${s.no}')">重置</button>
-            ` : `
-                <input type="number" step="0.01" class="btn" style="width:80px;background:white;border:1px solid #ccc;color:black;" 
-                       value="${res || ''}" placeholder="米" onchange="saveDist('${s.class}','${s.no}',this.value)"> 米
-            `;
+            ` : `<input type="number" step="0.01" class="btn" style="width:80px;background:white;border:1px solid #ccc;color:black;" value="${res || ''}" onchange="saveDist('${s.class}','${s.no}',this.value)"> 米`;
 
-            return `<tr>
-                <td><strong>${s.name}</strong></td>
-                <td>${s.class} (${s.no})</td>
-                <td id="res-${sId}" style="color:#d93025; font-weight:bold;">${res ? (isTime ? (res/1000).toFixed(3)+'秒' : res+'米') : '無'}</td>
-                <td>${control}</td>
-            </tr>`;
+            return `<tr><td><strong>${s.name}</strong></td><td>${s.class} (${s.no})</td><td id="res-${sId}" style="color:#d93025; font-weight:bold;">${res ? (isTime ? (res/1000).toFixed(3)+'秒' : res+'米') : '無'}</td><td>${control}</td></tr>`;
         }).join('');
         updateLeaderboard();
     }
@@ -334,67 +294,38 @@
     function startTimer(id) {
         if(runningTimers[id]) return;
         const start = Date.now();
-        runningTimers[id] = setInterval(() => {
-            document.getElementById('disp-'+id).innerText = ((Date.now() - start)/1000).toFixed(3);
-        }, 10);
-        document.getElementById('start-'+id).style.display = 'none';
-        document.getElementById('stop-'+id).style.display = 'inline-block';
+        runningTimers[id] = setInterval(() => document.getElementById('disp-'+id).innerText = ((Date.now() - start)/1000).toFixed(3), 10);
+        document.getElementById('start-'+id).style.display = 'none'; document.getElementById('stop-'+id).style.display = 'inline-block';
     }
-
     function stopTimer(id) {
         clearInterval(runningTimers[id]);
         const final = parseFloat(document.getElementById('disp-'+id).innerText) * 1000;
         delete runningTimers[id];
-        const [cls, no] = id.split('-');
-        const s = students.find(x => x.class === cls && String(x.no) === no);
-        s.results[document.getElementById('eventSelect').value] = final;
+        const [c, n] = id.split('-');
+        students.find(x => x.class === c && String(x.no) === n).results[document.getElementById('eventSelect').value] = final;
         refreshRecordView();
     }
+    function saveDist(c, n, val) { students.find(x => x.class === c && String(x.no) === n).results[document.getElementById('eventSelect').value] = val ? parseFloat(val) : null; refreshRecordView(); }
+    function resetScore(c, n) { students.find(x => x.class === c && String(x.no) === n).results[document.getElementById('eventSelect').value] = null; refreshRecordView(); }
 
-    function saveDist(cls, no, val) {
-        const s = students.find(x => x.class === cls && String(x.no) === no);
-        s.results[document.getElementById('eventSelect').value] = val ? parseFloat(val) : null;
-        updateLeaderboard();
-        refreshRecordView();
-    }
-
-    function resetScore(cls, no) {
-        const s = students.find(x => x.class === cls && String(x.no) === no);
-        s.results[document.getElementById('eventSelect').value] = null;
-        refreshRecordView();
-    }
-
-    // --- 排行榜 ---
     function updateLeaderboard() {
         const gId = document.getElementById('groupFilter').value;
         const evt = document.getElementById('eventSelect').value;
-        const lbList = document.getElementById('lbList');
-        if(!gId) { lbList.innerHTML=''; return; }
-
+        if(!gId) return;
         let scores = students.filter(s => s.groupId == gId && s.results[evt] !== null);
         scores.sort((a, b) => evt === 'softball' ? b.results[evt] - a.results[evt] : a.results[evt] - b.results[evt]);
-
-        lbList.innerHTML = scores.slice(0, 8).map((s, i) => `
+        document.getElementById('lbList').innerHTML = scores.slice(0, 8).map((s, i) => `
             <tr style="${i===0?'background:#fff59d;font-weight:bold;':''}">
-                <td>${i+1}</td>
-                <td>${s.name}</td>
-                <td>${s.class}</td>
-                <td>${evt === 'softball' ? s.results[evt]+'米' : (s.results[evt]/1000).toFixed(3)+'秒'}</td>
+                <td>${i+1}</td><td>${s.name}</td><td>${s.class}</td><td>${evt === 'softball' ? s.results[evt]+'米' : (s.results[evt]/1000).toFixed(3)+'秒'}</td>
             </tr>
         `).join('');
     }
 
-    // --- 導出成績 ---
     function exportToExcel() {
         const data = students.map(s => {
             const g = groups.find(x => x.id == s.groupId);
             return {
-                '班別': s.class,
-                '學號': s.no,
-                'STRN': s.strn,
-                '姓名': s.name,
-                '性別': s.gender,
-                '出生日期': s.dob,
+                '班別': s.class, '學號': s.no, '姓名': s.name, '性別': s.gender, '出生日期': s.dob,
                 '分配組別': g ? g.name : '未分組',
                 '60米(秒)': s.results['60m'] ? (s.results['60m']/1000).toFixed(3) : '',
                 '100米(秒)': s.results['100m'] ? (s.results['100m']/1000).toFixed(3) : '',
@@ -402,11 +333,8 @@
             };
         });
         const ws = XLSX.utils.json_to_sheet(data);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "體育成績");
-        XLSX.writeFile(wb, "智能分組體育成績.xlsx");
+        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "體育成績"); XLSX.writeFile(wb, "智能分組體育成績.xlsx");
     }
 </script>
-
 </body>
 </html>
