@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>專業體育智能分組紀錄系統</title>
+    <title>運動會成績記錄系統V1.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body { font-family: 'PingFang HK', 'Microsoft JhengHei', sans-serif; background-color: #f4f7f9; margin: 0; padding: 20px; }
@@ -44,7 +44,7 @@
 <body>
 
 <div class="container">
-    <h1>🏆 體育成績智能分組紀錄系統</h1>
+    <h1>🏆 運動會成績記錄系統V1.0</h1>
 
     <div class="main-nav">
         <button class="nav-btn active" onclick="showPanel('import')">1. 匯入與備份</button>
@@ -189,7 +189,7 @@
         
         if(panelId === 'groups') { renderGroupEditor(); renderAssignmentList(); }
         if(panelId === 'record') { updateGroupFilters(); refreshRecordView(); }
-        if(panelId === 'summary') { renderSummaryView(); } // 載入總結報表
+        if(panelId === 'summary') { renderSummaryView(); }
     }
 
     // --- 匯入 Excel ---
@@ -305,7 +305,7 @@
         document.getElementById('lbList').innerHTML = scores.slice(0, 8).map((s, i) => `<tr style="${i===0?'background:#fff59d;font-weight:bold;':''}"><td>${i+1}</td><td>${s.name}</td><td>${s.class}</td><td>${evt === 'softball' ? s.results[evt]+' 米' : (s.results[evt]/1000).toFixed(3)+' 秒'}</td></tr>`).join('');
     }
 
-    // --- 新增：總排名報表功能 ---
+    // --- 總排名報表功能 ---
     function renderSummaryView() {
         const container = document.getElementById('summaryContainer');
         container.innerHTML = '';
@@ -325,7 +325,6 @@
                 let scores = students.filter(s => s.groupId === g.id && s.results[evt] !== null);
                 if(scores.length > 0) {
                     groupHasData = true;
-                    // 排列名次
                     scores.sort((a, b) => evt === 'softball' ? b.results[evt] - a.results[evt] : a.results[evt] - b.results[evt]);
                     
                     groupHtml += `
@@ -356,7 +355,6 @@
         container.innerHTML = html || '<p style="text-align:center; color:#888;">尚無任何已完成的成績紀錄。請先到「記錄成績」頁面輸入。</p>';
     }
 
-    // 導出名單原始資料 (保留原本在第1頁的功能)
     function exportRawToExcel() {
         const data = students.map(s => {
             const g = groups.find(x => x.id == s.groupId);
@@ -372,12 +370,10 @@
         const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "原始名單與成績"); XLSX.writeFile(wb, "體育成績_全校原始資料.xlsx");
     }
 
-    // --- 新增：導出按名次排序的完整 Excel ---
     function exportRankingsToExcel() {
         const events = ['28m', '60m', '100m', 'softball'];
         let exportData = [];
 
-        // 依序抓出每個組別、每個項目的排名
         groups.forEach(g => {
             events.forEach(evt => {
                 let scores = students.filter(s => s.groupId === g.id && s.results[evt] !== null);
@@ -401,7 +397,6 @@
         if(exportData.length === 0) { alert("系統內尚無任何成績可以導出！"); return; }
 
         const ws = XLSX.utils.json_to_sheet(exportData);
-        // 設定欄寬令 Excel 顯示更漂亮
         ws['!cols'] = [{wch: 15}, {wch: 12}, {wch: 10}, {wch: 15}, {wch: 8}, {wch: 8}, {wch: 12}];
         const wb = XLSX.utils.book_new(); 
         XLSX.utils.book_append_sheet(wb, ws, "項目總排名表"); 
