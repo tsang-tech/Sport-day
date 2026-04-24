@@ -34,11 +34,13 @@
         .btn-success { background: #34a853; color: white; }
         .btn-danger { background: #ea4335; color: white; }
         .btn-warning { background: #fbbc04; color: black; font-weight: bold; }
+        .btn-outline { background: white; border: 2px solid #1a73e8; color: #1a73e8; font-weight: bold; }
+        .btn-outline:hover { background: #f0f4ff; }
         
         .input-score { width: 75px; padding: 6px; border: 1px solid #aaa; border-radius: 4px; font-family: monospace; font-size: 14px; text-align: center; font-weight: bold; color: #d93025; }
         .input-score:disabled { background: #eee; color: #888; }
         
-        .control-panel { display: flex; gap: 20px; margin-bottom: 20px; background: #eee; padding: 15px; border-radius: 10px; align-items: center; flex-wrap: wrap; }
+        .control-panel { display: flex; gap: 15px; margin-bottom: 20px; background: #eee; padding: 15px; border-radius: 10px; align-items: center; flex-wrap: wrap; }
     </style>
 </head>
 <body>
@@ -55,7 +57,7 @@
 
     <div id="panel-import" class="panel active">
         <div style="background: #e3f2fd; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
-            <h3>📥 Excel / CSV 名單匯入</h3>
+            <h3>📥 Excel / CSV 名單匯入 (初始名單)</h3>
             <p>請選擇包含「班別」、「學號」、「中文姓名」、「性別」、「出生日期」的檔案：</p>
             <input type="file" id="excelInput" accept=".xlsx, .xls, .csv">
             <hr>
@@ -103,8 +105,14 @@
                 <option value="softball">擲壘球</option>
             </select></div>
             <div>作賽組別：<select id="groupFilter" onchange="refreshRecordView()"></select></div>
-            <div style="margin-left: auto;">
-                <button class="btn btn-warning" onclick="manualAddStudent()">➕ 臨場新增學生</button>
+            
+            <div style="margin-left: auto; display: flex; gap: 8px;">
+                <button class="btn btn-warning" onclick="manualAddStudent()" title="臨場加入沒有在名單上的學生">➕ 臨場新增</button>
+                
+                <button class="btn btn-outline" onclick="document.getElementById('importMergeInput').click()" title="上傳另一部機的Excel，系統會自動合併成績">📥 匯入成績 (合併)</button>
+                <input type="file" id="importMergeInput" style="display:none" accept=".xlsx, .xls, .csv">
+                
+                <button class="btn btn-primary" onclick="exportRawToExcel()" title="下載目前所有學生的成績">💾 匯出成績</button>
             </div>
         </div>
 
@@ -133,8 +141,7 @@
             <button class="btn btn-success" onclick="exportRankingsToExcel()" style="font-size: 16px; padding: 12px 25px; font-weight: bold;">📥 導出完整排名至 Excel</button>
         </div>
         
-        <div id="summaryContainer" style="display: flex; flex-direction: column; gap: 30px;">
-        </div>
+        <div id="summaryContainer" style="display: flex; flex-direction: column; gap: 30px;"></div>
     </div>
 
 </div>
@@ -192,9 +199,10 @@
         if(panelId === 'summary') { renderSummaryView(); }
     }
 
-    // --- 匯入 Excel ---
+    // --- 匯入初始 Excel ---
     document.getElementById('excelInput').addEventListener('change', function(e) {
         const file = e.target.files[0];
+        if(!file) return;
         const reader = new FileReader();
         reader.onload = function(evt) {
             const data = new Uint8Array(evt.target.result);
@@ -211,6 +219,73 @@
             saveData(); updateClassDropdowns();
             document.getElementById('importStatus').innerText = `✅ 成功載入 ${students.length} 名學生。請按「第二步」進行一鍵分組。`;
             document.querySelectorAll('.nav-btn')[1].click(); 
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    // --- 【新功能：在成績紀錄頁面匯入並智能合併成績】 ---
+    document.getElementById('importMergeInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if(!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            try {
+                const data = new Uint8Array(evt.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                
+                let updatedCount = 0;
+
+                json.forEach(row => {
+                    // 1. 尋找對應的學生 (優先用 UID，沒有則用 班別+學號)
+                    let student = students.find(s => s.uid === row['UID(勿改)']);
+                    if (!student) {
+                        student = students.find(s => String(s.class) === String(row['班別']) && String(s.no) === String(row['學號']));
+                    }
+                    if (!student && row['姓名']) {
+                        student = students.find(s => s.name === row['姓名']);
+                    }
+
+                    if (student) {
+                        let isUpdated = false;
+                        
+                        // 2. 檢查各項成績並合併
+                        const mergeEvents = [
+                            { key: '28m', colName: '28米跑(秒)' },
+                            { key: '60m', colName: '60米跑(秒)' },
+                            { key: '100m', colName: '100米跑(秒)' },
+                            { key: 'softball', colName: '擲壘球(米)' }
+                        ];
+
+                        mergeEvents.forEach(evt => {
+                            if (row[evt.colName] !== undefined && row[evt.colName] !== '') {
+                                const val = parseFloat(row[evt.colName]);
+                                if (!isNaN(val)) {
+                                    // 系統底層時間是存毫秒，距離是存米
+                                    const storeVal = evt.key === 'softball' ? val : val * 1000;
+                                    
+                                    // 如果成績有更新，則寫入系統
+                                    if (student.results[evt.key] !== storeVal) {
+                                        student.results[evt.key] = storeVal;
+                                        isUpdated = true;
+                                    }
+                                }
+                            }
+                        });
+
+                        if (isUpdated) updatedCount++;
+                    }
+                });
+
+                saveData();
+                refreshRecordView();
+                alert(`✅ 智能合併完成！成功更新了 ${updatedCount} 名學生的成績。\n(原有資料不會被刪除，只有新成績被合併進去)`);
+                
+            } catch(err) {
+                alert("匯入失敗，請確保你匯入的是由本系統「匯出成績」所產生的 Excel 檔案。");
+            }
+            e.target.value = ''; // 清除 input 狀態以便下次重複匯入同一個檔案
         };
         reader.readAsArrayBuffer(file);
     });
@@ -258,6 +333,7 @@
         `).join('');
     }
     function updateStudentGroup(uid, groupId) { const s = students.find(x => x.uid === uid); if(s) { s.groupId = groupId ? Number(groupId) : null; saveData(); } }
+    
     function manualAddStudent() {
         const gId = document.getElementById('groupFilter').value; if(!gId) { alert("請先選擇作賽組別！"); return; }
         const name = prompt("輸入新增學生姓名："); if(!name) return;
@@ -355,10 +431,12 @@
         container.innerHTML = html || '<p style="text-align:center; color:#888;">尚無任何已完成的成績紀錄。請先到「記錄成績」頁面輸入。</p>';
     }
 
+    // --- 匯出所有成績名單 (增加了隱藏的 UID 作為合併標記) ---
     function exportRawToExcel() {
         const data = students.map(s => {
             const g = groups.find(x => x.id == s.groupId);
             return {
+                'UID(勿改)': s.uid,
                 '班別': s.class, '學號': s.no, '姓名': s.name, '性別': s.gender, '出生日期': s.dob,
                 '分配組別': g ? g.name : '未分組',
                 '28米跑(秒)': s.results['28m'] ? (s.results['28m']/1000).toFixed(3) : '',
