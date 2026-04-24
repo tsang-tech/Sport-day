@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>學生體育成績記錄系統</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }
+        h1, h2 { color: #2c3e50; text-align: center; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .tabs { display: flex; justify-content: center; margin-bottom: 20px; }
+        .tab-btn { background-color: #e0e0e0; border: none; padding: 10px 20px; margin: 0 5px; cursor: pointer; border-radius: 5px; font-size: 16px; transition: 0.3s; }
+        .tab-btn.active { background-color: #3498db; color: white; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #f8f9fa; }
+        .timer-display { font-family: monospace; font-size: 18px; margin-right: 10px; display: inline-block; width: 80px; }
+        .btn { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; color: white; }
+        .btn-start { background-color: #2ecc71; }
+        .btn-stop { background-color: #e74c3c; }
+        .btn-reset { background-color: #95a5a6; }
+        .input-distance { padding: 8px; width: 80px; border: 1px solid #ccc; border-radius: 4px; }
+        .leaderboard { background-color: #fff9c4; padding: 15px; border-radius: 8px; margin-top: 30px; }
+        .leaderboard h2 { margin-top: 0; color: #d35400; }
+        .rank-1 { font-weight: bold; color: #f1c40f; }
+        .rank-2 { font-weight: bold; color: #bdc3c7; }
+        .rank-3 { font-weight: bold; color: #cd7f32; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🏃‍♂️ 學生體育成績記錄系統</h1>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchEvent('60m')">60米短跑</button>
+        <button class="tab-btn" onclick="switchEvent('100m')">100米短跑</button>
+        <button class="tab-btn" onclick="switchEvent('softball')">擲壘球 (距離)</button>
+    </div>
+
+    <h2 id="current-event-title">60米短跑 記錄區</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>學號</th>
+                <th>姓名</th>
+                <th>成績記錄</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody id="student-list">
+            </tbody>
+    </table>
+
+    <div class="leaderboard">
+        <h2>🏆 當前項目 Top 8 排行榜</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>排名</th>
+                    <th>姓名</th>
+                    <th>成績</th>
+                </tr>
+            </thead>
+            <tbody id="leaderboard-list">
+                </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // 預設學生名單 (你可以自行修改或加入新增學生功能)
+    const students = [
+        { id: 1, name: '陳大文', results: { '60m': null, '100m': null, 'softball': null } },
+        { id: 2, name: '李小明', results: { '60m': null, '100m': null, 'softball': null } },
+        { id: 3, name: '張家輝', results: { '60m': null, '100m': null, 'softball': null } },
+        { id: 4, name: '王小玲', results: { '60m': null, '100m': null, 'softball': null } },
+        { id: 5, name: '何偉強', results: { '60m': null, '100m': null, 'softball': null } },
+        { id: 6, name: '周杰倫', results: { '60m': null, '100m': null, 'softball': null } },
+        { id: 7, name: '林志穎', results: { '60m': null, '100m': null, 'softball': null } },
+        { id: 8, name: '郭富城', results: { '60m': null, '100m': null, 'softball': null } },
+        { id: 9, name: '劉德華', results: { '60m': null, '100m': null, 'softball': null } },
+        { id: 10, name: '黎明', results: { '60m': null, '100m': null, 'softball': null } }
+    ];
+
+    let currentEvent = '60m';
+    const eventNames = { '60m': '60米短跑 (秒)', '100m': '100米短跑 (秒)', 'softball': '擲壘球 (米)' };
+    
+    // 計時器狀態管理
+    const timers = {};
+
+    function switchEvent(eventKey) {
+        currentEvent = eventKey;
+        document.getElementById('current-event-title').innerText = eventNames[eventKey] + ' 記錄區';
+        
+        // 更新按鈕樣式
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if(btn.innerText.includes(eventKey.replace('m', '米').replace('softball', '擲壘球'))) {
+                btn.classList.add('active');
+            }
+        });
+        
+        renderStudents();
+        updateLeaderboard();
+    }
+
+    function formatTime(ms) {
+        if (ms === null) return '0.000';
+        let totalSeconds = ms / 1000;
+        return totalSeconds.toFixed(3); // 精確到千分秒
+    }
+
+    function renderStudents() {
+        const tbody = document.getElementById('student-list');
+        tbody.innerHTML = '';
+
+        students.forEach((student, index) => {
+            const tr = document.createElement('tr');
+            
+            let controlHTML = '';
+            let currentResult = student.results[currentEvent];
+
+            if (currentEvent === 'softball') {
+                // 擲壘球使用輸入框
+                controlHTML = `
+                    <input type="number" class="input-distance" id="input-${student.id}" step="0.01" placeholder="輸入距離" value="${currentResult || ''}" onchange="saveDistance(${student.id}, this.value)"> 米
+                `;
+            } else {
+                // 跑步使用計時器
+                let displayTime = timers[student.id] ? formatTime(Date.now() - timers[student.id].startTime) : formatTime(currentResult);
+                
+                controlHTML = `
+                    <span class="timer-display" id="display-${student.id}">${displayTime}</span>
+                    <button class="btn btn-start" id="start-btn-${student.id}" onclick="startTimer(${student.id})">開始</button>
+                    <button class="btn btn-stop" id="stop-btn-${student.id}" onclick="stopTimer(${student.id})" style="display:none;">停止</button>
+                    <button class="btn btn-reset" onclick="resetTimer(${student.id})">重置</button>
+                `;
+            }
+
+            tr.innerHTML = `
+                <td>${student.id}</td>
+                <td>${student.name}</td>
+                <td id="cell-result-${student.id}">
+                    ${currentEvent === 'softball' ? (currentResult ? currentResult + ' 米' : '未有成績') : (currentResult ? formatTime(currentResult) + ' 秒' : '未有成績')}
+                </td>
+                <td>${controlHTML}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // 計時器邏輯
+    function startTimer(studentId) {
+        if (timers[studentId]) return; // 已在計時中
+        
+        timers[studentId] = {
+            startTime: Date.now(),
+            interval: setInterval(() => {
+                const elapsed = Date.now() - timers[studentId].startTime;
+                document.getElementById(`display-${studentId}`).innerText = formatTime(elapsed);
+            }, 10) // 每10毫秒更新一次畫面
+        };
+
+        document.getElementById(`start-btn-${studentId}`).style.display = 'none';
+        document.getElementById(`stop-btn-${studentId}`).style.display = 'inline-block';
+    }
+
+    function stopTimer(studentId) {
+        if (!timers[studentId]) return;
+
+        clearInterval(timers[studentId].interval);
+        const elapsed = Date.now() - timers[studentId].startTime;
+        delete timers[studentId];
+
+        // 儲存成績
+        const student = students.find(s => s.id === studentId);
+        student.results[currentEvent] = elapsed;
+
+        document.getElementById(`start-btn-${studentId}`).style.display = 'inline-block';
+        document.getElementById(`stop-btn-${studentId}`).style.display = 'none';
+        
+        renderStudents(); // 重新渲染以顯示更新後的成績
+        updateLeaderboard();
+    }
+
+    function resetTimer(studentId) {
+        if (timers[studentId]) {
+            clearInterval(timers[studentId].interval);
+            delete timers[studentId];
+        }
+        const student = students.find(s => s.id === studentId);
+        student.results[currentEvent] = null;
+        renderStudents();
+        updateLeaderboard();
+    }
+
+    function saveDistance(studentId, value) {
+        const student = students.find(s => s.id === studentId);
+        if (value) {
+            student.results[currentEvent] = parseFloat(value);
+        } else {
+            student.results[currentEvent] = null;
+        }
+        renderStudents();
+        updateLeaderboard();
+    }
+
+    // 即時排行榜邏輯 (選出Top 8)
+    function updateLeaderboard() {
+        const tbody = document.getElementById('leaderboard-list');
+        tbody.innerHTML = '';
+
+        // 過濾出有成績的學生
+        let validStudents = students.filter(s => s.results[currentEvent] !== null);
+
+        // 排序：跑步時間越少越好，擲壘球距離越遠越好
+        validStudents.sort((a, b) => {
+            if (currentEvent === 'softball') {
+                return b.results[currentEvent] - a.results[currentEvent]; // 降序
+            } else {
+                return a.results[currentEvent] - b.results[currentEvent]; // 升序
+            }
+        });
+
+        // 取前 8 名
+        const top8 = validStudents.slice(0, 8);
+
+        if (top8.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">暫無成績</td></tr>';
+            return;
+        }
+
+        top8.forEach((student, index) => {
+            const tr = document.createElement('tr');
+            let rankClass = index === 0 ? 'rank-1' : (index === 1 ? 'rank-2' : (index === 2 ? 'rank-3' : ''));
+            let displayResult = currentEvent === 'softball' ? student.results[currentEvent] + ' 米' : formatTime(student.results[currentEvent]) + ' 秒';
+            
+            tr.innerHTML = `
+                <td class="${rankClass}">${index + 1}</td>
+                <td>${student.name}</td>
+                <td>${displayResult}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // 初始化
+    renderStudents();
+    updateLeaderboard();
+</script>
+
+</body>
+</html>
