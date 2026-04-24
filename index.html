@@ -3,252 +3,308 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>學生體育成績記錄系統</title>
+    <title>學校體育成績記錄系統 - 專業版</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }
-        h1, h2 { color: #2c3e50; text-align: center; }
-        .container { max-width: 900px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .tabs { display: flex; justify-content: center; margin-bottom: 20px; }
-        .tab-btn { background-color: #e0e0e0; border: none; padding: 10px 20px; margin: 0 5px; cursor: pointer; border-radius: 5px; font-size: 16px; transition: 0.3s; }
-        .tab-btn.active { background-color: #3498db; color: white; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { background-color: #f8f9fa; }
-        .timer-display { font-family: monospace; font-size: 18px; margin-right: 10px; display: inline-block; width: 80px; }
-        .btn { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; color: white; }
-        .btn-start { background-color: #2ecc71; }
-        .btn-stop { background-color: #e74c3c; }
-        .btn-reset { background-color: #95a5a6; }
-        .input-distance { padding: 8px; width: 80px; border: 1px solid #ccc; border-radius: 4px; }
-        .leaderboard { background-color: #fff9c4; padding: 15px; border-radius: 8px; margin-top: 30px; }
-        .leaderboard h2 { margin-top: 0; color: #d35400; }
-        .rank-1 { font-weight: bold; color: #f1c40f; }
-        .rank-2 { font-weight: bold; color: #bdc3c7; }
-        .rank-3 { font-weight: bold; color: #cd7f32; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #1a73e8; margin-bottom: 25px; }
+        
+        /* 檔案上傳與篩選區 */
+        .config-section { background: #e8f0fe; padding: 20px; border-radius: 8px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
+        .config-item { display: flex; flex-direction: column; gap: 5px; }
+        label { font-weight: bold; font-size: 0.9em; color: #555; }
+        select, input[type="file"] { padding: 8px; border-radius: 4px; border: 1px solid #ccc; }
+
+        /* 頁籤導航 */
+        .tabs { display: flex; border-bottom: 2px solid #ddd; margin-bottom: 20px; }
+        .tab-btn { padding: 12px 25px; border: none; background: none; cursor: pointer; font-size: 16px; transition: 0.3s; border-bottom: 3px solid transparent; }
+        .tab-btn.active { color: #1a73e8; border-bottom-color: #1a73e8; font-weight: bold; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background-color: #fafafa; color: #666; text-transform: uppercase; font-size: 0.85em; }
+
+        /* 計時器與按鈕樣式 */
+        .timer-display { font-family: 'Courier New', Courier, monospace; font-size: 1.2em; font-weight: bold; color: #d93025; min-width: 80px; display: inline-block; }
+        .btn { padding: 8px 16px; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; transition: 0.2s; margin-right: 5px; }
+        .btn-start { background-color: #34a853; color: white; }
+        .btn-stop { background-color: #ea4335; color: white; }
+        .btn-reset { background-color: #9aa0a6; color: white; }
+        .input-score { width: 80px; padding: 6px; border: 1px solid #ddd; border-radius: 4px; }
+
+        /* 排行榜 */
+        .leaderboard { margin-top: 40px; padding: 20px; border: 2px solid #fbbc04; border-radius: 10px; background-color: #fffdf7; }
+        .leaderboard h2 { margin-top: 0; color: #f29900; display: flex; align-items: center; gap: 10px; }
+        .rank-1 { background-color: #ffd70044; font-weight: bold; }
+
+        .empty-state { text-align: center; padding: 40px; color: #888; font-style: italic; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>🏃‍♂️ 學生體育成績記錄系統</h1>
+    <h1>🏃‍♂️ 學校運動成績記錄系統</h1>
+
+    <div class="config-section">
+        <div class="config-item">
+            <label>1. 匯入名單 (Excel 轉出的 CSV)</label>
+            <input type="file" id="csvFileInput" accept=".csv">
+        </div>
+        <div class="config-item">
+            <label>2. 選擇班別</label>
+            <select id="classFilter" disabled onchange="handleClassChange()">
+                <option value="">-- 請先匯入名單 --</option>
+            </select>
+        </div>
+    </div>
 
     <div class="tabs">
         <button class="tab-btn active" onclick="switchEvent('60m')">60米短跑</button>
         <button class="tab-btn" onclick="switchEvent('100m')">100米短跑</button>
-        <button class="tab-btn" onclick="switchEvent('softball')">擲壘球 (距離)</button>
+        <button class="tab-btn" onclick="switchEvent('softball')">擲壘球</button>
     </div>
 
-    <h2 id="current-event-title">60米短跑 記錄區</h2>
+    <h2 id="currentEventTitle" style="color: #444;">60米短跑 記錄表</h2>
 
-    <table>
-        <thead>
-            <tr>
-                <th>學號</th>
-                <th>姓名</th>
-                <th>成績記錄</th>
-                <th>操作</th>
-            </tr>
-        </thead>
-        <tbody id="student-list">
+    <div id="tableContainer">
+        <table>
+            <thead>
+                <tr>
+                    <th>學號</th>
+                    <th>姓名</th>
+                    <th>性別</th>
+                    <th>最佳成績</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="studentList">
+                <tr><td colspan="5" class="empty-state">請匯入名單並選擇班別以開始</td></tr>
             </tbody>
-    </table>
+        </table>
+    </div>
 
     <div class="leaderboard">
-        <h2>🏆 當前項目 Top 8 排行榜</h2>
+        <h2>🏆 全校 Top 8 排行榜 (<span id="leaderboardTitle">60米</span>)</h2>
         <table>
             <thead>
                 <tr>
                     <th>排名</th>
+                    <th>班別</th>
                     <th>姓名</th>
                     <th>成績</th>
                 </tr>
             </thead>
-            <tbody id="leaderboard-list">
+            <tbody id="leaderboardList">
                 </tbody>
         </table>
     </div>
 </div>
 
 <script>
-    // 預設學生名單 (你可以自行修改或加入新增學生功能)
-    const students = [
-        { id: 1, name: '陳大文', results: { '60m': null, '100m': null, 'softball': null } },
-        { id: 2, name: '李小明', results: { '60m': null, '100m': null, 'softball': null } },
-        { id: 3, name: '張家輝', results: { '60m': null, '100m': null, 'softball': null } },
-        { id: 4, name: '王小玲', results: { '60m': null, '100m': null, 'softball': null } },
-        { id: 5, name: '何偉強', results: { '60m': null, '100m': null, 'softball': null } },
-        { id: 6, name: '周杰倫', results: { '60m': null, '100m': null, 'softball': null } },
-        { id: 7, name: '林志穎', results: { '60m': null, '100m': null, 'softball': null } },
-        { id: 8, name: '郭富城', results: { '60m': null, '100m': null, 'softball': null } },
-        { id: 9, name: '劉德華', results: { '60m': null, '100m': null, 'softball': null } },
-        { id: 10, name: '黎明', results: { '60m': null, '100m': null, 'softball': null } }
-    ];
-
+    let allStudents = [];
     let currentEvent = '60m';
-    const eventNames = { '60m': '60米短跑 (秒)', '100m': '100米短跑 (秒)', 'softball': '擲壘球 (米)' };
-    
-    // 計時器狀態管理
-    const timers = {};
+    let currentClass = '';
+    let runningTimers = {};
+
+    const eventConfig = {
+        '60m': { title: '60米短跑 (秒)', unit: '秒', type: 'time' },
+        '100m': { title: '100米短跑 (秒)', unit: '秒', type: 'time' },
+        'softball': { title: '擲壘球 (米)', unit: '米', type: 'distance' }
+    };
+
+    // --- CSV 處理邏輯 ---
+    document.getElementById('csvFileInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const text = event.target.result;
+            parseCSV(text);
+        };
+        reader.readAsText(file, 'UTF-8');
+    });
+
+    function parseCSV(csvText) {
+        const lines = csvText.split(/\r?\n/);
+        const students = [];
+        const classes = new Set();
+
+        // 跳過標題行，從第二行開始
+        for (let i = 1; i < lines.length; i++) {
+            if (!lines[i].trim()) continue;
+            
+            // 處理 CSV 的逗號分隔 (考慮到有些格式可能包含引號，這裡用簡單分割)
+            const cols = lines[i].split(',');
+            if (cols.length < 4) continue;
+
+            const student = {
+                class: cols[0].trim(),
+                no: cols[1].trim(),
+                enName: cols[2].trim(),
+                cnName: cols[3].trim(),
+                gender: cols[4].trim(),
+                results: { '60m': null, '100m': null, 'softball': null }
+            };
+            
+            students.push(student);
+            classes.add(student.class);
+        }
+
+        allStudents = students;
+        updateClassDropdown(Array.from(classes).sort());
+        alert('匯入成功！共載入 ' + students.length + ' 名學生。');
+    }
+
+    function updateClassDropdown(classList) {
+        const select = document.getElementById('classFilter');
+        select.innerHTML = '<option value="">-- 選擇班別 --</option>';
+        classList.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c;
+            opt.innerText = c;
+            select.appendChild(opt);
+        });
+        select.disabled = false;
+    }
+
+    // --- UI 邏輯 ---
+    function handleClassChange() {
+        currentClass = document.getElementById('classFilter').value;
+        renderStudents();
+    }
 
     function switchEvent(eventKey) {
         currentEvent = eventKey;
-        document.getElementById('current-event-title').innerText = eventNames[eventKey] + ' 記錄區';
+        document.getElementById('currentEventTitle').innerText = eventConfig[eventKey].title + ' 記錄表';
+        document.getElementById('leaderboardTitle').innerText = eventConfig[eventKey].title;
         
-        // 更新按鈕樣式
         document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.classList.remove('active');
-            if(btn.innerText.includes(eventKey.replace('m', '米').replace('softball', '擲壘球'))) {
-                btn.classList.add('active');
-            }
+            btn.classList.toggle('active', btn.innerText.includes(eventKey === 'softball' ? '擲壘球' : eventKey.replace('m','米')));
         });
-        
+
         renderStudents();
         updateLeaderboard();
     }
 
-    function formatTime(ms) {
-        if (ms === null) return '0.000';
-        let totalSeconds = ms / 1000;
-        return totalSeconds.toFixed(3); // 精確到千分秒
+    function formatDisplay(val) {
+        if (val === null) return '未有成績';
+        return eventConfig[currentEvent].type === 'time' ? (val / 1000).toFixed(3) + ' 秒' : val + ' 米';
     }
 
     function renderStudents() {
-        const tbody = document.getElementById('student-list');
+        const tbody = document.getElementById('studentList');
+        if (!currentClass) {
+            tbody.innerHTML = '<tr><td colspan="5" class="empty-state">請選擇班別</td></tr>';
+            return;
+        }
+
+        const filtered = allStudents.filter(s => s.class === currentClass);
         tbody.innerHTML = '';
 
-        students.forEach((student, index) => {
+        filtered.forEach((s) => {
             const tr = document.createElement('tr');
+            const studentId = `${s.class}-${s.no}`; // 唯一 ID
             
-            let controlHTML = '';
-            let currentResult = student.results[currentEvent];
-
-            if (currentEvent === 'softball') {
-                // 擲壘球使用輸入框
-                controlHTML = `
-                    <input type="number" class="input-distance" id="input-${student.id}" step="0.01" placeholder="輸入距離" value="${currentResult || ''}" onchange="saveDistance(${student.id}, this.value)"> 米
+            let actionHTML = '';
+            if (eventConfig[currentEvent].type === 'time') {
+                actionHTML = `
+                    <span class="timer-display" id="disp-${studentId}">0.000</span>
+                    <button class="btn btn-start" id="start-${studentId}" onclick="startTimer('${studentId}')">開始</button>
+                    <button class="btn btn-stop" id="stop-${studentId}" style="display:none;" onclick="stopTimer('${studentId}')">停止</button>
+                    <button class="btn btn-reset" onclick="resetScore('${s.class}', '${s.no}')">重置</button>
                 `;
             } else {
-                // 跑步使用計時器
-                let displayTime = timers[student.id] ? formatTime(Date.now() - timers[student.id].startTime) : formatTime(currentResult);
-                
-                controlHTML = `
-                    <span class="timer-display" id="display-${student.id}">${displayTime}</span>
-                    <button class="btn btn-start" id="start-btn-${student.id}" onclick="startTimer(${student.id})">開始</button>
-                    <button class="btn btn-stop" id="stop-btn-${student.id}" onclick="stopTimer(${student.id})" style="display:none;">停止</button>
-                    <button class="btn btn-reset" onclick="resetTimer(${student.id})">重置</button>
+                actionHTML = `
+                    <input type="number" class="input-score" step="0.01" placeholder="輸入距離" 
+                           onchange="saveDistance('${s.class}', '${s.no}', this.value)" value="${s.results[currentEvent] || ''}"> 米
                 `;
             }
 
             tr.innerHTML = `
-                <td>${student.id}</td>
-                <td>${student.name}</td>
-                <td id="cell-result-${student.id}">
-                    ${currentEvent === 'softball' ? (currentResult ? currentResult + ' 米' : '未有成績') : (currentResult ? formatTime(currentResult) + ' 秒' : '未有成績')}
-                </td>
-                <td>${controlHTML}</td>
+                <td>${s.no}</td>
+                <td>${s.cnName} <br><small>${s.enName}</small></td>
+                <td>${s.gender}</td>
+                <td id="res-${studentId}">${formatDisplay(s.results[currentEvent])}</td>
+                <td>${actionHTML}</td>
             `;
             tbody.appendChild(tr);
         });
     }
 
-    // 計時器邏輯
-    function startTimer(studentId) {
-        if (timers[studentId]) return; // 已在計時中
+    // --- 計時與記錄功能 ---
+    function startTimer(id) {
+        if (runningTimers[id]) return;
+        const startTime = Date.now();
+        runningTimers[id] = setInterval(() => {
+            const elapsed = Date.now() - startTime;
+            document.getElementById(`disp-${id}`).innerText = (elapsed / 1000).toFixed(3);
+        }, 10);
         
-        timers[studentId] = {
-            startTime: Date.now(),
-            interval: setInterval(() => {
-                const elapsed = Date.now() - timers[studentId].startTime;
-                document.getElementById(`display-${studentId}`).innerText = formatTime(elapsed);
-            }, 10) // 每10毫秒更新一次畫面
-        };
-
-        document.getElementById(`start-btn-${studentId}`).style.display = 'none';
-        document.getElementById(`stop-btn-${studentId}`).style.display = 'inline-block';
+        document.getElementById(`start-${id}`).style.display = 'none';
+        document.getElementById(`stop-${id}`).style.display = 'inline-block';
     }
 
-    function stopTimer(studentId) {
-        if (!timers[studentId]) return;
+    function stopTimer(id) {
+        clearInterval(runningTimers[id]);
+        const finalTime = parseFloat(document.getElementById(`disp-${id}`).innerText) * 1000;
+        delete runningTimers[id];
 
-        clearInterval(timers[studentId].interval);
-        const elapsed = Date.now() - timers[studentId].startTime;
-        delete timers[studentId];
+        // 尋找學生並更新 (注意：這裡使用 class 和 no 匹配)
+        const [cls, no] = id.split('-');
+        const student = allStudents.find(s => s.class === cls && s.no === no);
+        student.results[currentEvent] = finalTime;
 
-        // 儲存成績
-        const student = students.find(s => s.id === studentId);
-        student.results[currentEvent] = elapsed;
-
-        document.getElementById(`start-btn-${studentId}`).style.display = 'inline-block';
-        document.getElementById(`stop-btn-${studentId}`).style.display = 'none';
-        
-        renderStudents(); // 重新渲染以顯示更新後的成績
+        renderStudents();
         updateLeaderboard();
     }
 
-    function resetTimer(studentId) {
-        if (timers[studentId]) {
-            clearInterval(timers[studentId].interval);
-            delete timers[studentId];
-        }
-        const student = students.find(s => s.id === studentId);
+    function saveDistance(cls, no, val) {
+        const student = allStudents.find(s => s.class === cls && s.no === no);
+        student.results[currentEvent] = val ? parseFloat(val) : null;
+        updateLeaderboard();
+    }
+
+    function resetScore(cls, no) {
+        const student = allStudents.find(s => s.class === cls && s.no === no);
         student.results[currentEvent] = null;
         renderStudents();
         updateLeaderboard();
     }
 
-    function saveDistance(studentId, value) {
-        const student = students.find(s => s.id === studentId);
-        if (value) {
-            student.results[currentEvent] = parseFloat(value);
-        } else {
-            student.results[currentEvent] = null;
-        }
-        renderStudents();
-        updateLeaderboard();
-    }
-
-    // 即時排行榜邏輯 (選出Top 8)
+    // --- 排行榜 (跨班別 Top 8) ---
     function updateLeaderboard() {
-        const tbody = document.getElementById('leaderboard-list');
-        tbody.innerHTML = '';
+        const list = document.getElementById('leaderboardList');
+        list.innerHTML = '';
 
-        // 過濾出有成績的學生
-        let validStudents = students.filter(s => s.results[currentEvent] !== null);
+        let scores = allStudents
+            .filter(s => s.results[currentEvent] !== null)
+            .sort((a, b) => {
+                if (eventConfig[currentEvent].type === 'time') {
+                    return a.results[currentEvent] - b.results[currentEvent]; // 時間越短越前
+                } else {
+                    return b.results[currentEvent] - a.results[currentEvent]; // 距離越長越前
+                }
+            });
 
-        // 排序：跑步時間越少越好，擲壘球距離越遠越好
-        validStudents.sort((a, b) => {
-            if (currentEvent === 'softball') {
-                return b.results[currentEvent] - a.results[currentEvent]; // 降序
-            } else {
-                return a.results[currentEvent] - b.results[currentEvent]; // 升序
-            }
-        });
-
-        // 取前 8 名
-        const top8 = validStudents.slice(0, 8);
-
+        const top8 = scores.slice(0, 8);
         if (top8.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">暫無成績</td></tr>';
+            list.innerHTML = '<tr><td colspan="4" style="text-align:center;">尚無數據</td></tr>';
             return;
         }
 
-        top8.forEach((student, index) => {
+        top8.forEach((s, idx) => {
             const tr = document.createElement('tr');
-            let rankClass = index === 0 ? 'rank-1' : (index === 1 ? 'rank-2' : (index === 2 ? 'rank-3' : ''));
-            let displayResult = currentEvent === 'softball' ? student.results[currentEvent] + ' 米' : formatTime(student.results[currentEvent]) + ' 秒';
-            
+            if (idx === 0) tr.className = 'rank-1';
             tr.innerHTML = `
-                <td class="${rankClass}">${index + 1}</td>
-                <td>${student.name}</td>
-                <td>${displayResult}</td>
+                <td>${idx + 1}</td>
+                <td>${s.class}</td>
+                <td>${s.cnName}</td>
+                <td>${formatDisplay(s.results[currentEvent])}</td>
             `;
-            tbody.appendChild(tr);
+            list.appendChild(tr);
         });
     }
-
-    // 初始化
-    renderStudents();
-    updateLeaderboard();
 </script>
 
 </body>
